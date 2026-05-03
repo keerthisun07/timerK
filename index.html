@@ -1,0 +1,1975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>00:00:00 - Focus Timer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f8ff;
+      --bg-elevated: rgba(255, 255, 255, 0.82);
+      --panel: rgba(255, 255, 255, 0.7);
+      --text: #13294b;
+      --muted: #627592;
+      --accent: #2878ff;
+      --accent-strong: #155ee6;
+      --accent-soft: rgba(40, 120, 255, 0.14);
+      --border: rgba(19, 41, 75, 0.12);
+      --shadow: 0 20px 60px rgba(19, 41, 75, 0.12);
+      --danger: #d95c5c;
+      --timer-glow: rgba(40, 120, 255, 0.18);
+    }
+
+    body.dark {
+      color-scheme: dark;
+      --bg: #0d1728;
+      --bg-elevated: rgba(16, 26, 44, 0.82);
+      --panel: rgba(13, 23, 40, 0.72);
+      --text: #e7edf7;
+      --muted: #9eb0ca;
+      --accent: #67a6ff;
+      --accent-strong: #4b92f6;
+      --accent-soft: rgba(103, 166, 255, 0.16);
+      --border: rgba(231, 237, 247, 0.12);
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      --danger: #ff8585;
+      --timer-glow: rgba(103, 166, 255, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      min-height: 100%;
+      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    body {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(96, 165, 250, 0.1), transparent 30%),
+        var(--bg);
+      transition: background 0.25s ease, color 0.25s ease;
+      overflow: hidden;
+    }
+
+    button,
+    input,
+    label {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--bg-elevated);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(40, 120, 255, 0.45);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      min-height: 100vh;
+      padding: 18px;
+      gap: 14px;
+      overflow: hidden;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .top-bar-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .toolbar-button,
+    .notes-toggle,
+    .settings-toggle,
+    .theme-toggle,
+    .mode-toggle {
+      padding: 12px 16px;
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 600;
+    }
+
+    .theme-toggle {
+      position: relative;
+      top: 0;
+      right: 0;
+    }
+
+    .top-bar-actions {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .settings-toggle {
+      min-width: 48px;
+      padding: 12px 14px;
+      font-size: 1.1rem;
+    }
+
+    .settings-menu {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      width: min(280px, 86vw);
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 20px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 50;
+    }
+
+    .settings-menu.open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .settings-heading {
+      margin: 0 0 4px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .settings-action {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .main {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .notes-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: min(380px, 92vw);
+      max-width: 100%;
+      overflow: auto;
+      display: grid;
+      gap: 16px;
+      padding: 96px 20px 20px;
+      border-radius: 0 24px 24px 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      transform: translateX(calc(-100% - 24px));
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.28s ease, opacity 0.28s ease;
+      z-index: 40;
+    }
+
+    .notes-panel.open {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .notes-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(13, 23, 40, 0.16);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.24s ease;
+      z-index: 30;
+    }
+
+    .notes-backdrop.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .notes-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .notes-close {
+      min-width: 40px;
+      min-height: 40px;
+      padding: 0;
+      border-radius: 12px;
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .notes-title {
+      margin: 0;
+      font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      font-size: clamp(1.65rem, 2.8vw, 2.3rem);
+      font-style: italic;
+      font-weight: 700;
+      color: var(--accent);
+      text-shadow: 0 10px 24px rgba(40, 120, 255, 0.18);
+    }
+
+    .notes-subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .notes-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .notes-input,
+    .notes-textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--bg-elevated);
+      color: var(--text);
+      padding: 14px 16px;
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .notes-input:focus,
+    .notes-textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+
+    .notes-input {
+      min-height: 48px;
+      font-weight: 600;
+    }
+
+    .notes-textarea {
+      min-height: 120px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .notes-submit {
+      justify-self: start;
+      min-width: 126px;
+      min-height: 48px;
+      padding: 12px 18px;
+      font-weight: 700;
+    }
+
+    .notes-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .note-card {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(40, 120, 255, 0.12), rgba(40, 120, 255, 0.05));
+      border: 1px solid rgba(40, 120, 255, 0.2);
+      box-shadow: 0 10px 26px rgba(16, 32, 58, 0.08);
+    }
+
+    .note-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .note-card-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .note-card-body {
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .note-delete {
+      min-width: 34px;
+      min-height: 34px;
+      padding: 0;
+      border-radius: 10px;
+      color: var(--danger);
+      font-size: 1rem;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .notes-empty {
+      margin: 0;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px dashed var(--border);
+      color: var(--muted);
+      text-align: center;
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .timer-layout {
+      width: min(100%, 940px);
+      display: grid;
+      gap: 18px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .greeting-block {
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+    }
+
+    .greeting-title {
+      margin: 0;
+      font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      font-size: clamp(2rem, 5vw, 3.4rem);
+      font-style: italic;
+      font-weight: 700;
+      color: #155ee6;
+      text-shadow: 0 12px 28px rgba(40, 120, 255, 0.22);
+    }
+
+    body.dark .greeting-title {
+      color: #8dbcff;
+      text-shadow: 0 12px 28px rgba(103, 166, 255, 0.22);
+    }
+
+    .greeting-subtitle {
+      margin: 0;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(40, 120, 255, 0.24);
+      background: rgba(40, 120, 255, 0.1);
+      color: var(--text);
+      font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+      font-size: clamp(1rem, 2.3vw, 1.2rem);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .timer-display {
+      font-size: clamp(3.4rem, 13vw, 9rem);
+      line-height: 0.92;
+      letter-spacing: 0;
+      font-weight: 800;
+      margin: 0;
+      text-shadow: 0 0 28px var(--timer-glow);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timer-label {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .inputs-grid {
+      width: min(100%, 580px);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      text-align: left;
+      padding: 12px;
+      border-radius: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .field label {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .field input {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--bg-elevated);
+      color: var(--text);
+      padding: 14px 16px;
+      font-size: 1.15rem;
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+
+    .field input:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .control-button {
+      min-width: 118px;
+      min-height: 50px;
+      padding: 12px 20px;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    .primary:hover {
+      background: var(--accent-strong);
+      border-color: transparent;
+    }
+
+    .danger {
+      color: var(--danger);
+    }
+
+    .upload-wrap {
+      position: relative;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      box-shadow: var(--shadow);
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+
+    .upload-wrap input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .secondary-button {
+      padding: 12px 18px;
+      min-height: 48px;
+      font-weight: 600;
+    }
+
+    @media (max-height: 860px) {
+      .app-shell {
+        padding: 14px;
+        gap: 12px;
+      }
+
+      .timer-layout {
+        gap: 14px;
+      }
+
+      .greeting-block {
+        gap: 6px;
+      }
+
+      .greeting-title {
+        font-size: clamp(1.9rem, 4vw, 2.8rem);
+      }
+
+      .greeting-subtitle {
+        padding: 6px 14px;
+      }
+
+      .timer-display {
+        font-size: clamp(3rem, 11vw, 7.2rem);
+      }
+
+      .inputs-grid {
+        gap: 12px;
+      }
+
+      .field {
+        padding: 10px;
+      }
+
+      .field input {
+        padding: 12px 14px;
+      }
+
+      .controls {
+        gap: 10px;
+      }
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 10, 20, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+
+    .modal-backdrop.visible {
+      display: flex;
+    }
+
+    .modal {
+      width: min(100%, 460px);
+      padding: 28px;
+      border-radius: 24px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      text-align: center;
+      backdrop-filter: blur(16px);
+    }
+
+    .modal h2 {
+      margin: 0 0 12px;
+      font-size: clamp(1.6rem, 4vw, 2rem);
+    }
+
+    .modal p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0 22px;
+      text-align: left;
+    }
+
+    .stat-tile {
+      padding: 16px;
+      border-radius: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+    }
+
+    .stat-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .stat-value {
+      display: block;
+      font-size: 1.4rem;
+      font-weight: 800;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 720px) {
+      .app-shell {
+        padding: 16px;
+      }
+
+      .top-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .top-bar-group {
+        justify-content: center;
+      }
+
+      .inputs-grid,
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .control-button {
+        flex: 1 1 140px;
+      }
+
+      .toolbar-button,
+      .notes-toggle,
+      .settings-toggle,
+      .theme-toggle,
+      .mode-toggle,
+      .upload-wrap {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 1180px) {
+      .notes-panel {
+        width: min(420px, 94vw);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app-shell {
+        padding: 14px;
+        gap: 14px;
+      }
+
+      .notes-panel {
+        padding: 16px;
+        padding-top: 84px;
+        border-radius: 0 20px 20px 0;
+      }
+
+      .notes-title {
+        font-size: 2rem;
+      }
+
+      .notes-submit,
+      .control-button,
+      .upload-wrap {
+        width: 100%;
+      }
+
+      .timer-layout {
+        width: 100%;
+        gap: 20px;
+      }
+
+      .timer-display {
+        font-size: clamp(3.2rem, 23vw, 5.6rem);
+      }
+
+      .greeting-title {
+        font-size: clamp(2rem, 12vw, 3rem);
+      }
+
+      .top-bar-actions,
+      .settings-menu {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="top-bar">
+      <div class="top-bar-group">
+        <button id="statsButton" class="toolbar-button" type="button" aria-haspopup="dialog">
+          View Stats
+        </button>
+        <button id="notesToggle" class="notes-toggle" type="button" aria-haspopup="dialog" aria-expanded="false">
+          Notes
+        </button>
+        <button id="pomodoroToggle" class="mode-toggle" type="button" aria-pressed="false">
+          Pomodoro Mode: Off
+        </button>
+      </div>
+      <div class="top-bar-group">
+        <div class="top-bar-actions">
+          <button id="themeToggle" class="theme-toggle" type="button" aria-pressed="false">
+            Dark Mode
+          </button>
+          <button id="settingsToggle" class="settings-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Settings">
+            ⚙
+          </button>
+          <div id="settingsMenu" class="settings-menu" role="menu" aria-hidden="true">
+            <p class="settings-heading">Settings</p>
+            <label class="upload-wrap settings-action" for="alarmUpload">
+              Upload Custom Alarm (MP3)
+              <input id="alarmUpload" type="file" accept=".mp3,audio/mpeg">
+            </label>
+            <button id="downloadButton" class="settings-action" type="button">Download App</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <div id="notesBackdrop" class="notes-backdrop" aria-hidden="true"></div>
+
+      <aside id="notesPanel" class="notes-panel" aria-label="Keerthi notes" aria-hidden="true">
+        <div class="notes-toolbar">
+          <div>
+            <h2 class="notes-title">Keerthi's Notes</h2>
+            <p class="notes-subtitle">Quick little reminders in your own Keep-style corner.</p>
+          </div>
+          <button id="notesCloseButton" class="notes-close" type="button" aria-label="Close notes">×</button>
+        </div>
+
+        <div class="notes-form">
+          <input id="noteTitleInput" class="notes-input" type="text" maxlength="80" placeholder="Note title">
+          <textarea id="noteContentInput" class="notes-textarea" maxlength="600" placeholder="Write your note here..."></textarea>
+          <button id="addNoteButton" class="notes-submit primary" type="button">Add Note</button>
+        </div>
+
+        <div id="notesList" class="notes-list" aria-live="polite"></div>
+      </aside>
+
+      <section class="timer-layout" aria-label="Focus timer">
+        <div class="greeting-block" aria-label="Greeting">
+          <p class="greeting-title">Hi Keerthi!</p>
+          <p class="greeting-subtitle">Lets study!!</p>
+        </div>
+
+        <div>
+          <p id="timerLabel" class="timer-label">Set your timer and start when ready.</p>
+          <h1 id="timerDisplay" class="timer-display" aria-live="polite">00:00:00</h1>
+        </div>
+
+        <section class="inputs-grid" aria-label="Timer inputs">
+          <div class="field">
+            <label for="hoursInput">Hours</label>
+            <input id="hoursInput" type="number" min="0" max="99" value="0" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="minutesInput">Minutes</label>
+            <input id="minutesInput" type="number" min="0" max="59" value="0" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="secondsInput">Seconds</label>
+            <input id="secondsInput" type="number" min="0" max="59" value="0" inputmode="numeric">
+          </div>
+        </section>
+
+        <div class="controls" aria-label="Timer controls">
+          <button id="startButton" class="control-button primary" type="button">Start</button>
+          <button id="pauseButton" class="control-button" type="button">Pause</button>
+          <button id="resetButton" class="control-button danger" type="button">Reset</button>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <div id="finishModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="finishTitle" aria-describedby="finishMessage">
+    <div class="modal">
+      <h2 id="finishTitle">Session complete</h2>
+      <p id="finishMessage">Congratulations, you have completed your task! You can do more!!</p>
+      <div class="modal-actions">
+        <button id="dismissAlarmButton" class="control-button primary" type="button">OK / Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="statsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <div class="modal">
+      <h2 id="statsTitle">Your Stats</h2>
+      <div class="stats-grid">
+        <div class="stat-tile">
+          <span class="stat-label">Focused today</span>
+          <span id="todayMinutesValue" class="stat-value">00:00:00</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label">Daily streak</span>
+          <span id="streakValue" class="stat-value">🔥 0-Day Streak</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label">Completed sessions</span>
+          <span id="sessionsValue" class="stat-value">0</span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label">Saved alarm</span>
+          <span id="savedAlarmValue" class="stat-value">No</span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="resetStatsButton" class="control-button danger" type="button">Reset Stats</button>
+        <button id="closeStatsButton" class="control-button primary" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="alarmAudio" preload="auto" class="sr-only"></audio>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const STORAGE_KEYS = {
+        theme: "focusTimer.theme",
+        stats: "focusTimer.stats",
+        alarmData: "focusTimer.alarmDataUrl",
+        alarmName: "focusTimer.alarmName",
+        notes: "focusTimer.notes",
+        pomodoroEnabled: "focusTimer.pomodoroEnabled",
+        manualSeconds: "focusTimer.manualSeconds"
+      };
+
+      const POMODORO_WORK_SECONDS = 25 * 60;
+      const POMODORO_BREAK_SECONDS = 5 * 60;
+      const APP_NAME = "Focus Timer";
+
+      const elements = {
+        body: document.body,
+        timerDisplay: document.getElementById("timerDisplay"),
+        timerLabel: document.getElementById("timerLabel"),
+        hoursInput: document.getElementById("hoursInput"),
+        minutesInput: document.getElementById("minutesInput"),
+        secondsInput: document.getElementById("secondsInput"),
+        startButton: document.getElementById("startButton"),
+        pauseButton: document.getElementById("pauseButton"),
+        resetButton: document.getElementById("resetButton"),
+        themeToggle: document.getElementById("themeToggle"),
+        settingsToggle: document.getElementById("settingsToggle"),
+        settingsMenu: document.getElementById("settingsMenu"),
+        pomodoroToggle: document.getElementById("pomodoroToggle"),
+        notesToggle: document.getElementById("notesToggle"),
+        alarmUpload: document.getElementById("alarmUpload"),
+        notesPanel: document.getElementById("notesPanel"),
+        notesBackdrop: document.getElementById("notesBackdrop"),
+        notesCloseButton: document.getElementById("notesCloseButton"),
+        noteTitleInput: document.getElementById("noteTitleInput"),
+        noteContentInput: document.getElementById("noteContentInput"),
+        addNoteButton: document.getElementById("addNoteButton"),
+        notesList: document.getElementById("notesList"),
+        finishModal: document.getElementById("finishModal"),
+        finishTitle: document.getElementById("finishTitle"),
+        finishMessage: document.getElementById("finishMessage"),
+        dismissAlarmButton: document.getElementById("dismissAlarmButton"),
+        statsButton: document.getElementById("statsButton"),
+        statsModal: document.getElementById("statsModal"),
+        resetStatsButton: document.getElementById("resetStatsButton"),
+        closeStatsButton: document.getElementById("closeStatsButton"),
+        todayMinutesValue: document.getElementById("todayMinutesValue"),
+        streakValue: document.getElementById("streakValue"),
+        sessionsValue: document.getElementById("sessionsValue"),
+        savedAlarmValue: document.getElementById("savedAlarmValue"),
+        downloadButton: document.getElementById("downloadButton"),
+        alarmAudio: document.getElementById("alarmAudio")
+      };
+
+      const state = {
+        timerId: null,
+        remainingSeconds: 0,
+        initialSeconds: 0,
+        isRunning: false,
+        isPaused: false,
+        pomodoroEnabled: false,
+        pomodoroPhase: "work",
+        manualSeconds: 0,
+        theme: "light",
+        alarmDataUrl: "",
+        alarmName: "",
+        audioContext: null,
+        alarmObjectUrl: "",
+        alarmMimeType: "audio/mpeg",
+        alarmArrayBuffer: null,
+        decodedAlarmBuffer: null,
+        currentAlarmSource: null,
+        currentAlarmElement: null,
+        audioUnlocked: false,
+        alarmElementPrimed: false,
+        fallbackAlarmInterval: null,
+        stopFallbackAudio: null,
+        notesOpen: false,
+        settingsOpen: false,
+        notes: [],
+        stats: createDefaultStats()
+      };
+
+      function createDefaultStats() {
+        return {
+          dailySeconds: {},
+          streak: 0,
+          lastCompletionDate: "",
+          completedSessions: 0
+        };
+      }
+
+      /*
+        localStorage helpers
+        These functions handle all saved user preferences and progress.
+      */
+      const storage = {
+        saveTheme(theme) {
+          localStorage.setItem(STORAGE_KEYS.theme, theme);
+        },
+        loadTheme() {
+          return localStorage.getItem(STORAGE_KEYS.theme) || "light";
+        },
+        savePomodoroEnabled(enabled) {
+          localStorage.setItem(STORAGE_KEYS.pomodoroEnabled, String(Boolean(enabled)));
+        },
+        loadPomodoroEnabled() {
+          return localStorage.getItem(STORAGE_KEYS.pomodoroEnabled) === "true";
+        },
+        saveManualSeconds(totalSeconds) {
+          localStorage.setItem(STORAGE_KEYS.manualSeconds, String(Math.max(0, Number(totalSeconds) || 0)));
+        },
+        loadManualSeconds() {
+          return Math.max(0, Number(localStorage.getItem(STORAGE_KEYS.manualSeconds)) || 0);
+        },
+        saveAlarm(dataUrl, name) {
+          try {
+            localStorage.setItem(STORAGE_KEYS.alarmData, dataUrl || "");
+            localStorage.setItem(STORAGE_KEYS.alarmName, name || "");
+            return true;
+          } catch (error) {
+            return false;
+          }
+        },
+        loadAlarm() {
+          return {
+            dataUrl: localStorage.getItem(STORAGE_KEYS.alarmData) || "",
+            name: localStorage.getItem(STORAGE_KEYS.alarmName) || ""
+          };
+        },
+        saveNotes(notes) {
+          localStorage.setItem(STORAGE_KEYS.notes, JSON.stringify(notes));
+        },
+        loadNotes() {
+          const raw = localStorage.getItem(STORAGE_KEYS.notes);
+          if (!raw) {
+            return [];
+          }
+
+          try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (error) {
+            return [];
+          }
+        },
+        saveStats(stats) {
+          localStorage.setItem(STORAGE_KEYS.stats, JSON.stringify(stats));
+        },
+        loadStats() {
+          const raw = localStorage.getItem(STORAGE_KEYS.stats);
+          if (!raw) {
+            return createDefaultStats();
+          }
+
+          try {
+            const parsed = JSON.parse(raw);
+            const dailySeconds = parsed.dailySeconds || {};
+            const dailyMinutes = parsed.dailyMinutes || {};
+            Object.keys(dailyMinutes).forEach(function (key) {
+              if (dailySeconds[key] == null) {
+                dailySeconds[key] = (Number(dailyMinutes[key]) || 0) * 60;
+              }
+            });
+            return {
+              dailySeconds: dailySeconds,
+              streak: Number(parsed.streak) || 0,
+              lastCompletionDate: parsed.lastCompletionDate || "",
+              completedSessions: Number(parsed.completedSessions) || 0
+            };
+          } catch (error) {
+            return createDefaultStats();
+          }
+        }
+      };
+
+      function pad(value) {
+        return String(value).padStart(2, "0");
+      }
+
+      function formatTime(totalSeconds) {
+        const safeSeconds = Math.max(0, totalSeconds);
+        const hours = Math.floor(safeSeconds / 3600);
+        const minutes = Math.floor((safeSeconds % 3600) / 60);
+        const seconds = safeSeconds % 60;
+        return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+      }
+
+      function getTodayKey() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = pad(today.getMonth() + 1);
+        const day = pad(today.getDate());
+        return `${year}-${month}-${day}`;
+      }
+
+      function dayDifference(fromDate, toDate) {
+        const start = new Date(fromDate + "T00:00:00");
+        const end = new Date(toDate + "T00:00:00");
+        const milliseconds = end.getTime() - start.getTime();
+        return Math.round(milliseconds / 86400000);
+      }
+
+      function clampInput(value, max) {
+        const number = Math.max(0, Math.min(max, Number(value) || 0));
+        return Math.floor(number);
+      }
+
+      function setInputsFromSeconds(totalSeconds) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        elements.hoursInput.value = hours;
+        elements.minutesInput.value = minutes;
+        elements.secondsInput.value = seconds;
+      }
+
+      function getInputSeconds() {
+        const hours = clampInput(elements.hoursInput.value, 99);
+        const minutes = clampInput(elements.minutesInput.value, 59);
+        const seconds = clampInput(elements.secondsInput.value, 59);
+
+        elements.hoursInput.value = hours;
+        elements.minutesInput.value = minutes;
+        elements.secondsInput.value = seconds;
+
+        return (hours * 3600) + (minutes * 60) + seconds;
+      }
+
+      function updateDocumentTitle() {
+        let titlePrefix = formatTime(state.remainingSeconds);
+        if (!state.isRunning && state.remainingSeconds === 0) {
+          titlePrefix = "00:00:00";
+        }
+        document.title = `${titlePrefix} - ${APP_NAME}`;
+      }
+
+      function updateTimerDisplay() {
+        elements.timerDisplay.textContent = formatTime(state.remainingSeconds);
+        updateDocumentTitle();
+      }
+
+      function updateModeBadge() {
+        elements.timerLabel.textContent = "";
+      }
+
+      function applyTheme(theme) {
+        state.theme = theme === "dark" ? "dark" : "light";
+        elements.body.classList.toggle("dark", state.theme === "dark");
+        elements.themeToggle.textContent = state.theme === "dark" ? "Light Mode" : "Dark Mode";
+        elements.themeToggle.setAttribute("aria-pressed", String(state.theme === "dark"));
+        storage.saveTheme(state.theme);
+      }
+
+      function updateAlarmUi() {
+        elements.savedAlarmValue.textContent = state.alarmDataUrl ? "Yes" : "No";
+      }
+
+      function formatFocusDuration(totalSeconds) {
+        const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
+        const hours = Math.floor(safeSeconds / 3600);
+        const minutes = Math.floor((safeSeconds % 3600) / 60);
+        const seconds = safeSeconds % 60;
+        return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+      }
+
+      function updateStatsUi() {
+        const todayKey = getTodayKey();
+        const todaySeconds = Number(state.stats.dailySeconds[todayKey]) || 0;
+        elements.todayMinutesValue.textContent = formatFocusDuration(todaySeconds);
+        elements.streakValue.textContent = `🔥 ${state.stats.streak}-Day Streak`;
+        elements.sessionsValue.textContent = String(state.stats.completedSessions);
+        updateAlarmUi();
+      }
+
+      function saveStats() {
+        storage.saveStats(state.stats);
+        updateStatsUi();
+      }
+
+      function resetStats() {
+        const confirmed = window.confirm("Reset all stats in this section?");
+        if (!confirmed) {
+          return;
+        }
+
+        state.stats = createDefaultStats();
+        saveStats();
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function saveNotes() {
+        storage.saveNotes(state.notes);
+        renderNotes();
+      }
+
+      function renderNotes() {
+        if (!state.notes.length) {
+          elements.notesList.innerHTML = "";
+          return;
+        }
+
+        elements.notesList.innerHTML = state.notes.map(function (note) {
+          return `
+            <article class="note-card">
+              <div class="note-card-header">
+                <h3 class="note-card-title">${escapeHtml(note.title || "Untitled")}</h3>
+                <button class="note-delete" type="button" data-note-id="${note.id}" aria-label="Delete note">×</button>
+              </div>
+              <p class="note-card-body">${escapeHtml(note.content)}</p>
+            </article>
+          `;
+        }).join("");
+      }
+
+      function addNote() {
+        const title = elements.noteTitleInput.value.trim();
+        const content = elements.noteContentInput.value.trim();
+
+        if (!title && !content) {
+          window.alert("Please add a title or some note content first.");
+          return;
+        }
+
+        state.notes.unshift({
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+          title: title,
+          content: content
+        });
+
+        elements.noteTitleInput.value = "";
+        elements.noteContentInput.value = "";
+        saveNotes();
+      }
+
+      function deleteNote(noteId) {
+        state.notes = state.notes.filter(function (note) {
+          return note.id !== noteId;
+        });
+        saveNotes();
+      }
+
+      function setNotesDrawerOpen(isOpen) {
+        state.notesOpen = Boolean(isOpen);
+        elements.notesPanel.classList.toggle("open", state.notesOpen);
+        elements.notesBackdrop.classList.toggle("visible", state.notesOpen);
+        elements.notesPanel.setAttribute("aria-hidden", String(!state.notesOpen));
+        elements.notesToggle.setAttribute("aria-expanded", String(state.notesOpen));
+
+        if (state.notesOpen) {
+          window.setTimeout(function () {
+            elements.noteTitleInput.focus();
+          }, 80);
+        }
+      }
+
+      function setSettingsMenuOpen(isOpen) {
+        state.settingsOpen = Boolean(isOpen);
+        elements.settingsMenu.classList.toggle("open", state.settingsOpen);
+        elements.settingsMenu.setAttribute("aria-hidden", String(!state.settingsOpen));
+        elements.settingsToggle.setAttribute("aria-expanded", String(state.settingsOpen));
+      }
+
+      function setPomodoroEnabled(enabled) {
+        state.pomodoroEnabled = Boolean(enabled);
+        storage.savePomodoroEnabled(state.pomodoroEnabled);
+        elements.pomodoroToggle.textContent = state.pomodoroEnabled ? "Pomodoro Mode: On" : "Pomodoro Mode: Off";
+        elements.pomodoroToggle.setAttribute("aria-pressed", String(state.pomodoroEnabled));
+
+        const disableManualInputs = state.pomodoroEnabled;
+        elements.hoursInput.disabled = disableManualInputs;
+        elements.minutesInput.disabled = disableManualInputs;
+        elements.secondsInput.disabled = disableManualInputs;
+
+        if (state.pomodoroEnabled) {
+          state.manualSeconds = getInputSeconds();
+          storage.saveManualSeconds(state.manualSeconds);
+          state.pomodoroPhase = "work";
+          state.initialSeconds = POMODORO_WORK_SECONDS;
+          state.remainingSeconds = POMODORO_WORK_SECONDS;
+          setInputsFromSeconds(POMODORO_WORK_SECONDS);
+        } else {
+          setInputsFromSeconds(state.manualSeconds);
+          state.initialSeconds = state.manualSeconds;
+          state.remainingSeconds = state.initialSeconds;
+        }
+
+        state.isPaused = false;
+        updateModeBadge();
+        updateTimerDisplay();
+      }
+
+      function getAudioContext() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+          return null;
+        }
+
+        if (!state.audioContext) {
+          state.audioContext = new AudioContextClass();
+        }
+
+        return state.audioContext;
+      }
+
+      async function unlockAudioPlayback() {
+        const audioContext = getAudioContext();
+        if (!audioContext) {
+          return;
+        }
+
+        try {
+          if (audioContext.state === "suspended") {
+            await audioContext.resume();
+          }
+          state.audioUnlocked = audioContext.state === "running";
+        } catch (error) {
+          state.audioUnlocked = false;
+        }
+      }
+
+      function dataUrlToAudioBytes(dataUrl) {
+        const matches = /^data:([^;]+);base64,(.+)$/.exec(dataUrl || "");
+        if (!matches) {
+          return null;
+        }
+
+        const mimeType = matches[1] || "audio/mpeg";
+        const binaryString = window.atob(matches[2]);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let index = 0; index < binaryString.length; index += 1) {
+          bytes[index] = binaryString.charCodeAt(index);
+        }
+
+        return {
+          mimeType: mimeType,
+          arrayBuffer: bytes.buffer
+        };
+      }
+
+      function clearAlarmResources() {
+        state.alarmArrayBuffer = null;
+        state.decodedAlarmBuffer = null;
+        state.alarmElementPrimed = false;
+        if (state.alarmObjectUrl) {
+          URL.revokeObjectURL(state.alarmObjectUrl);
+          state.alarmObjectUrl = "";
+        }
+        elements.alarmAudio.pause();
+        elements.alarmAudio.removeAttribute("src");
+        elements.alarmAudio.load();
+      }
+
+      async function prepareAlarmResources(dataUrl) {
+        clearAlarmResources();
+        if (!dataUrl) {
+          return false;
+        }
+
+        const alarmBytes = dataUrlToAudioBytes(dataUrl);
+        if (!alarmBytes) {
+          return false;
+        }
+
+        state.alarmMimeType = alarmBytes.mimeType;
+        state.alarmArrayBuffer = alarmBytes.arrayBuffer.slice(0);
+        state.alarmObjectUrl = URL.createObjectURL(new Blob([state.alarmArrayBuffer], { type: state.alarmMimeType }));
+        elements.alarmAudio.src = state.alarmObjectUrl;
+        elements.alarmAudio.preload = "auto";
+        elements.alarmAudio.load();
+
+        await unlockAudioPlayback();
+
+        const audioContext = getAudioContext();
+        if (!audioContext) {
+          return true;
+        }
+
+        try {
+          state.decodedAlarmBuffer = await audioContext.decodeAudioData(state.alarmArrayBuffer.slice(0));
+        } catch (error) {
+          state.decodedAlarmBuffer = null;
+        }
+
+        return true;
+      }
+
+      async function decodeAlarmBuffer(dataUrl) {
+        state.decodedAlarmBuffer = null;
+        if (!dataUrl) {
+          return;
+        }
+
+        const audioContext = getAudioContext();
+        if (!audioContext) {
+          return;
+        }
+
+        try {
+          const bufferToDecode = state.alarmArrayBuffer ? state.alarmArrayBuffer.slice(0) : (dataUrlToAudioBytes(dataUrl) || {}).arrayBuffer;
+          if (!bufferToDecode) {
+            return;
+          }
+          const decoded = await audioContext.decodeAudioData(bufferToDecode.slice(0));
+          state.decodedAlarmBuffer = decoded;
+        } catch (error) {
+          state.decodedAlarmBuffer = null;
+        }
+      }
+
+      function setAlarmElementSource() {
+        if (!state.alarmObjectUrl) {
+          elements.alarmAudio.removeAttribute("src");
+          elements.alarmAudio.load();
+          return;
+        }
+        if (elements.alarmAudio.src !== state.alarmObjectUrl) {
+          elements.alarmAudio.src = state.alarmObjectUrl;
+        }
+        elements.alarmAudio.load();
+      }
+
+      async function primeAlarmElement() {
+        if (!state.alarmObjectUrl) {
+          return false;
+        }
+
+        try {
+          setAlarmElementSource();
+          elements.alarmAudio.loop = false;
+          elements.alarmAudio.muted = false;
+          elements.alarmAudio.volume = 0.0001;
+          elements.alarmAudio.currentTime = 0;
+          await elements.alarmAudio.play();
+          elements.alarmAudio.pause();
+          elements.alarmAudio.currentTime = 0;
+          elements.alarmAudio.volume = 1;
+          state.alarmElementPrimed = true;
+          return true;
+        } catch (error) {
+          elements.alarmAudio.muted = false;
+          elements.alarmAudio.volume = 1;
+          state.alarmElementPrimed = false;
+          return false;
+        }
+      }
+
+      function clearTimer() {
+        if (state.timerId) {
+          window.clearInterval(state.timerId);
+          state.timerId = null;
+        }
+        state.isRunning = false;
+      }
+
+      function startPomodoroPhase(phase) {
+        state.pomodoroPhase = phase;
+        state.initialSeconds = phase === "break" ? POMODORO_BREAK_SECONDS : POMODORO_WORK_SECONDS;
+        state.remainingSeconds = state.initialSeconds;
+        setInputsFromSeconds(state.initialSeconds);
+        state.isRunning = true;
+        state.isPaused = false;
+        updateModeBadge();
+        elements.timerLabel.textContent = phase === "break" ? "Break in progress." : "Focus session in progress.";
+        updateTimerDisplay();
+        state.timerId = window.setInterval(tick, 1000);
+      }
+
+      function recordCompletedFocusSession(secondsCompleted) {
+        const todayKey = getTodayKey();
+        const focusedSeconds = Math.max(0, Math.round(secondsCompleted));
+
+        state.stats.dailySeconds[todayKey] = (Number(state.stats.dailySeconds[todayKey]) || 0) + focusedSeconds;
+        state.stats.completedSessions += 1;
+
+        if (state.stats.lastCompletionDate !== todayKey) {
+          if (!state.stats.lastCompletionDate) {
+            state.stats.streak = 1;
+          } else {
+            const difference = dayDifference(state.stats.lastCompletionDate, todayKey);
+            state.stats.streak = difference === 1 ? state.stats.streak + 1 : 1;
+          }
+          state.stats.lastCompletionDate = todayKey;
+        }
+
+        saveStats();
+      }
+
+      function playFallbackAlarm() {
+        stopFallbackAlarm();
+
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+          return;
+        }
+
+        const audioContext = new AudioContextClass();
+        state.fallbackAlarmInterval = window.setInterval(function () {
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+
+          oscillator.type = "sine";
+          oscillator.frequency.value = 880;
+          gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.35);
+
+          oscillator.connect(gain);
+          gain.connect(audioContext.destination);
+
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + 0.36);
+        }, 700);
+
+        state.stopFallbackAudio = function () {
+          if (audioContext.state !== "closed") {
+            audioContext.close();
+          }
+        };
+      }
+
+      function stopFallbackAlarm() {
+        if (state.fallbackAlarmInterval) {
+          window.clearInterval(state.fallbackAlarmInterval);
+          state.fallbackAlarmInterval = null;
+        }
+        if (typeof state.stopFallbackAudio === "function") {
+          state.stopFallbackAudio();
+          state.stopFallbackAudio = null;
+        }
+      }
+
+      function stopDecodedAlarm() {
+        if (state.currentAlarmSource) {
+          try {
+            state.currentAlarmSource.stop();
+          } catch (error) {
+            // No extra work needed if the source already stopped.
+          }
+          state.currentAlarmSource.disconnect();
+          state.currentAlarmSource = null;
+        }
+      }
+
+      async function playAlarm() {
+        stopAlarm();
+        await unlockAudioPlayback();
+
+        const audioContext = getAudioContext();
+        if (!state.decodedAlarmBuffer && state.alarmDataUrl) {
+          await decodeAlarmBuffer(state.alarmDataUrl);
+        }
+
+        if (state.decodedAlarmBuffer && audioContext) {
+          try {
+            if (audioContext.state === "suspended") {
+              await audioContext.resume();
+            }
+            const source = audioContext.createBufferSource();
+            source.buffer = state.decodedAlarmBuffer;
+            source.loop = true;
+            source.connect(audioContext.destination);
+            source.start(0);
+            state.currentAlarmSource = source;
+            return;
+          } catch (error) {
+            state.currentAlarmSource = null;
+          }
+        }
+
+        if (state.alarmObjectUrl) {
+          try {
+            setAlarmElementSource();
+            elements.alarmAudio.loop = true;
+            elements.alarmAudio.muted = false;
+            elements.alarmAudio.volume = 1;
+            elements.alarmAudio.currentTime = 0;
+            await elements.alarmAudio.play();
+            state.alarmElementPrimed = true;
+            return;
+          } catch (error) {
+            state.alarmElementPrimed = false;
+            try {
+              const fallbackElement = new Audio(state.alarmObjectUrl);
+              fallbackElement.loop = true;
+              fallbackElement.volume = 1;
+              await fallbackElement.play();
+              elements.alarmAudio.pause();
+              elements.alarmAudio.removeAttribute("src");
+              elements.alarmAudio.srcObject = null;
+              state.currentAlarmElement = fallbackElement;
+              return;
+            } catch (secondaryError) {
+              state.currentAlarmElement = null;
+            }
+          }
+        }
+
+        playFallbackAlarm();
+      }
+
+      function stopAlarm() {
+        stopDecodedAlarm();
+        if (state.currentAlarmElement) {
+          state.currentAlarmElement.pause();
+          state.currentAlarmElement.currentTime = 0;
+          state.currentAlarmElement = null;
+        }
+        elements.alarmAudio.pause();
+        elements.alarmAudio.currentTime = 0;
+        elements.alarmAudio.volume = 1;
+        stopFallbackAlarm();
+      }
+
+      function openModal(modalElement) {
+        modalElement.classList.add("visible");
+      }
+
+      function closeModal(modalElement) {
+        modalElement.classList.remove("visible");
+      }
+
+      function completeTimer() {
+        clearTimer();
+        state.remainingSeconds = 0;
+        updateTimerDisplay();
+        playAlarm();
+
+        let followUp = "";
+        if (state.pomodoroEnabled && state.pomodoroPhase === "work") {
+          recordCompletedFocusSession(POMODORO_WORK_SECONDS);
+          followUp = " Your 5-minute break has started automatically.";
+          startPomodoroPhase("break");
+        } else if (state.pomodoroEnabled && state.pomodoroPhase === "break") {
+          state.pomodoroPhase = "work";
+          state.initialSeconds = POMODORO_WORK_SECONDS;
+          state.remainingSeconds = POMODORO_WORK_SECONDS;
+          setInputsFromSeconds(POMODORO_WORK_SECONDS);
+          state.isRunning = false;
+          followUp = " Your next 25-minute focus timer is ready.";
+        } else {
+          recordCompletedFocusSession(state.initialSeconds);
+          setInputsFromSeconds(state.initialSeconds);
+          state.isRunning = false;
+        }
+
+        state.isPaused = false;
+        updateModeBadge();
+        updateTimerDisplay();
+        elements.finishTitle.textContent = "Congratulations";
+        elements.finishMessage.textContent = `Congratulations, you have completed your task! You can do more!!${followUp}`;
+        openModal(elements.finishModal);
+      }
+
+      function tick() {
+        if (state.remainingSeconds <= 1) {
+          completeTimer();
+          return;
+        }
+
+        state.remainingSeconds -= 1;
+        updateTimerDisplay();
+      }
+
+      function startTimer() {
+        if (state.isRunning) {
+          return;
+        }
+
+        unlockAudioPlayback().then(function () {
+          if (state.alarmDataUrl && (!state.decodedAlarmBuffer || !state.alarmObjectUrl)) {
+            prepareAlarmResources(state.alarmDataUrl);
+          }
+          if (state.alarmDataUrl && !state.alarmElementPrimed) {
+            primeAlarmElement();
+          }
+        });
+
+        if (!state.isPaused) {
+          if (state.pomodoroEnabled) {
+            state.initialSeconds = state.pomodoroPhase === "work" ? POMODORO_WORK_SECONDS : POMODORO_BREAK_SECONDS;
+            state.remainingSeconds = state.initialSeconds;
+          } else {
+            state.initialSeconds = getInputSeconds();
+            state.remainingSeconds = state.initialSeconds;
+          }
+        }
+
+        if (state.remainingSeconds <= 0) {
+          window.alert("Please set a timer longer than 0 seconds.");
+          return;
+        }
+
+        closeModal(elements.finishModal);
+        stopAlarm();
+
+        state.isRunning = true;
+        state.isPaused = false;
+        updateModeBadge();
+        elements.timerLabel.textContent = state.pomodoroEnabled
+          ? (state.pomodoroPhase === "break" ? "Break in progress." : "Focus session in progress.")
+          : "Timer running.";
+        updateTimerDisplay();
+
+        state.timerId = window.setInterval(tick, 1000);
+      }
+
+      function pauseTimer() {
+        if (!state.isRunning) {
+          return;
+        }
+        clearTimer();
+        state.isPaused = true;
+      }
+
+      function resetTimer() {
+        clearTimer();
+        stopAlarm();
+        closeModal(elements.finishModal);
+
+        state.isPaused = false;
+        if (state.pomodoroEnabled) {
+          state.pomodoroPhase = "work";
+          state.initialSeconds = POMODORO_WORK_SECONDS;
+          state.remainingSeconds = POMODORO_WORK_SECONDS;
+          setInputsFromSeconds(POMODORO_WORK_SECONDS);
+        } else {
+          state.initialSeconds = getInputSeconds();
+          state.remainingSeconds = state.initialSeconds;
+          state.manualSeconds = state.initialSeconds;
+          storage.saveManualSeconds(state.manualSeconds);
+        }
+
+        state.isRunning = false;
+        updateModeBadge();
+        updateTimerDisplay();
+      }
+
+      function handleAlarmUpload(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) {
+          return;
+        }
+
+        if (file.size > 4 * 1024 * 1024) {
+          window.alert("This MP3 is larger than 4MB. Please choose a smaller file so it fits safely in localStorage.");
+          elements.alarmUpload.value = "";
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async function (loadEvent) {
+          const result = String(loadEvent.target.result || "");
+          const saved = storage.saveAlarm(result, file.name);
+          if (!saved) {
+            window.alert("This alarm is too large to store in localStorage after conversion. Please choose a smaller MP3.");
+            elements.alarmUpload.value = "";
+            return;
+          }
+
+          state.alarmDataUrl = result;
+          state.alarmName = file.name;
+          await prepareAlarmResources(state.alarmDataUrl);
+          await primeAlarmElement();
+          updateAlarmUi();
+          setSettingsMenuOpen(false);
+          window.alert(state.decodedAlarmBuffer
+            ? "Custom alarm saved locally and is ready after refresh."
+            : "Custom alarm saved locally. If playback is blocked in your browser, click Start once before testing again.");
+        };
+        reader.onerror = function () {
+          window.alert("The alarm file could not be read. Please try another MP3.");
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function updateDisplayFromInputs() {
+        if (state.pomodoroEnabled || state.isRunning || state.isPaused) {
+          return;
+        }
+        state.initialSeconds = getInputSeconds();
+        state.remainingSeconds = state.initialSeconds;
+        state.manualSeconds = state.initialSeconds;
+        storage.saveManualSeconds(state.manualSeconds);
+        updateTimerDisplay();
+      }
+
+      function buildDownloadSourceFromDom() {
+        const clonedDocument = document.documentElement.cloneNode(true);
+        const clonedTitle = clonedDocument.querySelector("title");
+        if (clonedTitle) {
+          clonedTitle.textContent = "00:00:00 - Focus Timer";
+        }
+
+        clonedDocument.querySelectorAll(".modal-backdrop.visible").forEach(function (modal) {
+          modal.classList.remove("visible");
+        });
+
+        return "<!DOCTYPE html>\n" + clonedDocument.outerHTML;
+      }
+
+      async function downloadCurrentHtml() {
+        let source = "";
+
+        if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+          try {
+            const response = await window.fetch(window.location.href, { cache: "no-store" });
+            if (response.ok) {
+              source = await response.text();
+            }
+          } catch (error) {
+            source = "";
+          }
+        }
+
+        if (!source) {
+          source = buildDownloadSourceFromDom();
+        }
+
+        const blob = new Blob([source], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = "keerthi-focus-timer.html";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        window.setTimeout(function () {
+          URL.revokeObjectURL(url);
+        }, 2000);
+        setSettingsMenuOpen(false);
+      }
+
+      function loadSavedState() {
+        applyTheme(storage.loadTheme());
+        state.stats = storage.loadStats();
+        state.notes = storage.loadNotes();
+
+        const savedAlarm = storage.loadAlarm();
+        state.alarmDataUrl = savedAlarm.dataUrl;
+        state.alarmName = savedAlarm.name;
+
+        state.manualSeconds = storage.loadManualSeconds();
+        setInputsFromSeconds(state.manualSeconds);
+        state.initialSeconds = state.manualSeconds;
+        state.remainingSeconds = state.initialSeconds;
+        setPomodoroEnabled(storage.loadPomodoroEnabled());
+        updateStatsUi();
+        renderNotes();
+        if (state.alarmDataUrl) {
+          prepareAlarmResources(state.alarmDataUrl);
+        }
+      }
+
+      function bindAudioUnlockEvents() {
+        ["click", "touchstart", "keydown"].forEach(function (eventName) {
+          document.addEventListener(eventName, function handleFirstGesture() {
+            unlockAudioPlayback().then(function () {
+              if (state.alarmDataUrl && (!state.decodedAlarmBuffer || !state.alarmObjectUrl)) {
+                prepareAlarmResources(state.alarmDataUrl);
+              }
+              if (state.alarmDataUrl && !state.alarmElementPrimed) {
+                primeAlarmElement();
+              }
+            });
+          }, { once: true });
+        });
+      }
+
+      elements.startButton.addEventListener("click", startTimer);
+      elements.pauseButton.addEventListener("click", pauseTimer);
+      elements.resetButton.addEventListener("click", resetTimer);
+      elements.themeToggle.addEventListener("click", function () {
+        applyTheme(state.theme === "dark" ? "light" : "dark");
+      });
+      elements.settingsToggle.addEventListener("click", function () {
+        setSettingsMenuOpen(!state.settingsOpen);
+      });
+      elements.notesToggle.addEventListener("click", function () {
+        setNotesDrawerOpen(!state.notesOpen);
+      });
+      elements.notesCloseButton.addEventListener("click", function () {
+        setNotesDrawerOpen(false);
+      });
+      elements.notesBackdrop.addEventListener("click", function () {
+        setNotesDrawerOpen(false);
+      });
+      elements.pomodoroToggle.addEventListener("click", function () {
+        clearTimer();
+        stopAlarm();
+        closeModal(elements.finishModal);
+        setPomodoroEnabled(!state.pomodoroEnabled);
+      });
+      elements.alarmUpload.addEventListener("change", handleAlarmUpload);
+      elements.addNoteButton.addEventListener("click", addNote);
+      elements.statsButton.addEventListener("click", function () {
+        updateStatsUi();
+        openModal(elements.statsModal);
+      });
+      elements.resetStatsButton.addEventListener("click", resetStats);
+      elements.closeStatsButton.addEventListener("click", function () {
+        closeModal(elements.statsModal);
+      });
+      elements.dismissAlarmButton.addEventListener("click", function () {
+        stopAlarm();
+        closeModal(elements.finishModal);
+        updateModeBadge();
+        updateTimerDisplay();
+      });
+      elements.downloadButton.addEventListener("click", downloadCurrentHtml);
+
+      [elements.hoursInput, elements.minutesInput, elements.secondsInput].forEach(function (input) {
+        input.addEventListener("input", updateDisplayFromInputs);
+      });
+
+      elements.noteContentInput.addEventListener("keydown", function (event) {
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+          addNote();
+        }
+      });
+
+      elements.notesList.addEventListener("click", function (event) {
+        const deleteButton = event.target.closest("[data-note-id]");
+        if (!deleteButton) {
+          return;
+        }
+        deleteNote(deleteButton.getAttribute("data-note-id"));
+      });
+
+      [elements.finishModal, elements.statsModal].forEach(function (modal) {
+        modal.addEventListener("click", function (event) {
+          if (event.target === modal) {
+            if (modal === elements.finishModal) {
+              stopAlarm();
+            }
+            closeModal(modal);
+          }
+        });
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          stopAlarm();
+          closeModal(elements.finishModal);
+          closeModal(elements.statsModal);
+          setNotesDrawerOpen(false);
+          setSettingsMenuOpen(false);
+        }
+      });
+
+      document.addEventListener("click", function (event) {
+        if (!state.settingsOpen) {
+          return;
+        }
+        const clickedInsideSettings = event.target.closest("#settingsMenu") || event.target.closest("#settingsToggle");
+        if (!clickedInsideSettings) {
+          setSettingsMenuOpen(false);
+        }
+      });
+
+      window.addEventListener("beforeunload", function () {
+        stopAlarm();
+        clearAlarmResources();
+      });
+
+      bindAudioUnlockEvents();
+      loadSavedState();
+    })();
+  </script>
+</body>
+</html>
